@@ -1,0 +1,32 @@
+commit 4b0ed8b6030450e6d99909a7c683e9642e546387
+Author: Michael Hudson-Doyle <michael.hudson@canonical.com>
+Date:   Wed Jun 7 13:52:17 2017 -0700
+
+    fix test_remove_watch_file flakiness
+    
+    pass a known-good file descriptor to watch_file rather than hard-coding 5
+    
+    Fixes #164
+
+diff --git a/urwid/tests/test_event_loops.py b/urwid/tests/test_event_loops.py
+index c85bbed..b01212d 100644
+--- a/urwid/tests/test_event_loops.py
++++ b/urwid/tests/test_event_loops.py
+@@ -30,9 +30,14 @@ class EventLoopTestMixin(object):
+ 
+     def test_remove_watch_file(self):
+         evl = self.evl
+-        handle = evl.watch_file(5, lambda: None)
+-        self.assertTrue(evl.remove_watch_file(handle))
+-        self.assertFalse(evl.remove_watch_file(handle))
++        fd_r, fd_w = os.pipe()
++        try:
++            handle = evl.watch_file(fd_r, lambda: None)
++            self.assertTrue(evl.remove_watch_file(handle))
++            self.assertFalse(evl.remove_watch_file(handle))
++        finally:
++            os.close(fd_r)
++            os.close(fd_w)
+ 
+     _expected_idle_handle = 1
+ 
