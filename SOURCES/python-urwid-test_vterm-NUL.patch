@@ -1,0 +1,47 @@
+commit 701138a380fac06023e5915448af92ba13614cb9
+Author: aszlig <aszlig@redmoonstudios.org>
+Date:   Thu Feb 11 03:14:07 2016 +0100
+
+    vterm: Fix handling of NUL characters
+    
+    According to the VT100 programmers manual, the NUL character has to be
+    ignored (at least on our side, because we are not a printer):
+    
+    http://vt100.net/docs/tp83/appendixb.html
+    
+    According to the bug reporter the VMS console driver inserts NUL
+    characters after line feeds and our implementation prints those as "?".
+    
+    Tested against Python 2.7, 3.2, 3.3, 3.4 and 3.5.
+    
+    Signed-off-by: aszlig <aszlig@redmoonstudios.org>
+    Reported-by: Robert Urban <urban@unix-beratung.de>
+
+diff --git a/urwid/tests/test_vterm.py b/urwid/tests/test_vterm.py
+index 59fe166..4dadfcc 100644
+--- a/urwid/tests/test_vterm.py
++++ b/urwid/tests/test_vterm.py
+@@ -143,6 +143,10 @@ class TermTest(unittest.TestCase):
+         self.write('1\n2\n3\n4\e[2;1f\e[2M')
+         self.expect('1\n4')
+ 
++    def test_nul(self):
++        self.write('a\0b')
++        self.expect('ab')
++
+     def test_movement(self):
+         self.write('\e[10;20H11\e[10;0f\e[20C\e[K')
+         self.expect('\n' * 9 + ' ' * 19 + '1')
+diff --git a/urwid/vterm.py b/urwid/vterm.py
+index cc4eb7f..0f091ea 100644
+--- a/urwid/vterm.py
++++ b/urwid/vterm.py
+@@ -671,7 +671,7 @@ class TermCanvas(Canvas):
+             self.widget.beep()
+         elif not dc and char in B("\x18\x1a"): # CAN/SUB
+             self.leave_escape()
+-        elif not dc and char == B("\x7f"): # DEL
++        elif not dc and char in B("\x00\x7f"): # NUL/DEL
+             pass # this is ignored
+         elif self.within_escape:
+             self.parse_escape(char)
